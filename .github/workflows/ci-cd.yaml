@@ -65,6 +65,15 @@ jobs:
           aws eks update-kubeconfig \
             --name eks-ahsan-final1 \
             --region us-east-1
+      
+      - name: Create Kubernetes Secrets
+        run: |
+          kubectl create secret generic expensy-secrets \
+            --from-literal=REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+            --from-literal=MONGO_USERNAME="${{ secrets.MONGO_USERNAME }}" \
+            --from-literal=MONGO_PASSWORD="${{ secrets.MONGO_PASSWORD }}" \
+            --from-literal=DATABASE_URI="${{ secrets.DATABASE_URI }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       # -------------------------
       # Deploy Kubernetes manifests
