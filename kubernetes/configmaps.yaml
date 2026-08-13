@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: expensy-config
+  namespace: default
+data:
+  PORT: "8706"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  NEXT_PUBLIC_API_URL: "http://localhost:8706"

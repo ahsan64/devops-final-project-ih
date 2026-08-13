@@ -1,0 +1,86 @@
+name: Expensy CI/CD Pipeline to EKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # -------------------------
+      # Docker Hub Login
+      # -------------------------
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # -------------------------
+      # Build + Push Backend
+      # -------------------------
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./expensy_backend
+          file: ./expensy_backend/Dockerfile.backend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/expensy-backend:latest
+
+      # -------------------------
+      # Build + Push Frontend
+      # -------------------------
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./expensy_frontend
+          file: ./expensy_frontend/Dockerfile.frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/expensy-frontend:latest
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://expensy-ahsan.ironlabs.online
+
+      # -------------------------
+      # AWS Authentication
+      # -------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # -------------------------
+      # Connect to EKS
+      # -------------------------
+      - name: Setup Kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name eks-ahsan-final1 \
+            --region us-east-1
+
+      # -------------------------
+      # Deploy Kubernetes manifests
+      # -------------------------
+      - name: Apply Kubernetes Manifests
+        run: |
+          kubectl apply -f kubernetes/ \
+            --recursive
+
+      # -------------------------
+      # Restart application pods
+      # -------------------------
+      - name: Restart Application Deployments
+        run: |
+          kubectl rollout restart deployment/expensy-backend
+          kubectl rollout restart deployment/expensy-frontend
+
+          kubectl rollout status deployment/expensy-backend --timeout=180s
+          kubectl rollout status deployment/expensy-frontend --timeout=180s
